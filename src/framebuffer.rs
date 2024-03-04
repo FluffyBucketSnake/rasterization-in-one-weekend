@@ -30,4 +30,12 @@ impl Framebuffer {
             .update_with_buffer(&self.color_attachment, self.width, self.height)
             .unwrap();
     }
+
+    pub fn width(&self) -> usize {
+        self.width
+    }
+
+    pub fn height(&self) -> usize {
+        self.height
+    }
 }

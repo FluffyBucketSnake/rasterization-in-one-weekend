@@ -1,7 +1,10 @@
 use minifb::{Key, KeyRepeat, Window, WindowOptions};
 use nalgebra_glm::vec2;
 use rasterization_in_a_weekend::{
-    color::WHITE, framebuffer::Framebuffer, rasterization::fill_triangle,
+    color::{BLUE, GREEN, RED},
+    framebuffer::Framebuffer,
+    rasterization::fill_triangle,
+    vertex::BasicVertex2D,
 };
 
 const WINDOW_TITLE: &str = "Rasterization in One Weekend";
@@ -19,9 +22,13 @@ fn main() {
     .unwrap();
     window.limit_update_rate(Some(std::time::Duration::from_micros(1000 / 60)));
 
-    let vertices = [vec2(480.0, 180.0), vec2(160.0, 90.0), vec2(160.0, 270.0)];
+    let vertices = [
+        BasicVertex2D::new(vec2(480.0, 180.0), RED),
+        BasicVertex2D::new(vec2(160.0, 90.0), GREEN),
+        BasicVertex2D::new(vec2(160.0, 270.0), BLUE),
+    ];
     while window.is_open() && !window.is_key_pressed(Key::Escape, KeyRepeat::No) {
-        fill_triangle(&mut framebuffer, &vertices, WHITE);
+        fill_triangle(&mut framebuffer, &vertices);
         framebuffer.update_window(&mut window);
     }
 }

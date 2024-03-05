@@ -1,6 +1,6 @@
 use minifb::Window;
 
-use crate::color::{to_raw_color, Color};
+use crate::color::{from_raw_color, to_raw_color, Color};
 
 pub struct Framebuffer {
     color_attachment: Vec<u32>,
@@ -23,6 +23,10 @@ impl Framebuffer {
 
     pub fn set_color(&mut self, coords: (usize, usize), color: Color) {
         self.color_attachment[coords.1 * self.width + coords.0] = to_raw_color(color);
+    }
+
+    pub fn get_color(&self, coords: (usize, usize)) -> Color {
+        from_raw_color(self.color_attachment[coords.1 * self.width + coords.0])
     }
 
     pub fn update_window(&self, window: &mut Window) {

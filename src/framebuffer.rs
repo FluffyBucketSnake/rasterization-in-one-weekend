@@ -1,3 +1,5 @@
+use std::ops::RangeBounds;
+
 use minifb::Window;
 
 use crate::color::{from_raw_color, to_raw_color, Color};
@@ -23,6 +25,15 @@ impl Framebuffer {
 
     pub fn set_color(&mut self, coords: (usize, usize), color: Color) {
         self.color_attachment[coords.1 * self.width + coords.0] = to_raw_color(color);
+    }
+
+    pub fn set_color_safe(&mut self, coords: (usize, usize), color: Color) {
+        match coords {
+            (x, y) if x < self.width && y < self.height => {
+                self.set_color(coords, color);
+            }
+            _ => {}
+        }
     }
 
     pub fn get_color(&self, coords: (usize, usize)) -> Color {

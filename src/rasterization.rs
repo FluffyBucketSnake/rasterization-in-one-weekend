@@ -1,12 +1,7 @@
-use nalgebra_glm::{vec2, Vec2};
+use nalgebra_glm::{vec2, vec3, Vec2, Vec3};
 
-use crate::{framebuffer::Framebuffer, vertex::Vertex};
-
-pub fn fill_triangle<V: Vertex>(framebuffer: &mut Framebuffer, vertices: &[V; 3]) {
-    let mut coords = vertices.iter().map(|v| v.coords()).copied();
-    let c0 = coords.next().unwrap();
-    let c1 = coords.next().unwrap();
-    let c2 = coords.next().unwrap();
+pub fn rasterize_solid_triangle(vertices: &[Vec2; 3], mut f: impl FnMut(Vec2, Vec3)) {
+    let [c0, c1, c2] = *vertices;
 
     let min = c0.inf(&c1.inf(&c2));
     let max = c0.sup(&c1.sup(&c2));
@@ -26,10 +21,7 @@ pub fn fill_triangle<V: Vertex>(framebuffer: &mut Framebuffer, vertices: &[V; 3]
             let w = edge_function(c0, c1, p) + w_bias;
 
             if u >= 0.0 && v >= 0.0 && w >= 0.0 {
-                framebuffer.set_color(
-                    (x as usize, y as usize),
-                    V::fragment_color(vertices, u / signed_area, v / signed_area),
-                );
+                f(vec2(x.trunc(), y.trunc()), vec3(u, v, w) / signed_area)
             }
             x += 1.0;
         }
@@ -56,66 +48,29 @@ fn left_or_top_edge_bias(start: Vec2, end: Vec2) -> f32 {
 
 #[cfg(test)]
 mod test {
-    use crate::color::{BLACK, WHITE};
-
     use super::*;
-
-    #[derive(Debug, Clone)]
-    struct DummyVertex(Vec2);
-
-    impl Vertex for DummyVertex {
-        fn fragment_color(_: &[Self; 3], _: f32, _: f32) -> crate::color::Color {
-            WHITE
-        }
-
-        fn coords(&self) -> &Vec2 {
-            &self.0
-        }
-    }
-
-    fn vertex(x: f32, y: f32) -> DummyVertex {
-        DummyVertex(vec2(x, y))
-    }
 
     #[test]
     pub fn half_pixel_center() {
-        let mut framebuffer = Framebuffer::new(9, 9);
-        framebuffer.clear(BLACK);
+        let mut fragments = Vec::new();
 
-        fill_triangle(
-            &mut framebuffer,
-            &[vertex(1.25, 1.25), vertex(1.5, 1.75), vertex(1.75, 1.25)],
+        rasterize_solid_triangle(
+            &[vec2(1.25, 1.25), vec2(1.5, 1.75), vec2(1.75, 1.25)],
+            |coords, _| fragments.push(coords),
         );
 
-        for y in 0..9 {
-            for x in 0..9 {
-                if (x, y) == (1, 1) {
-                    continue;
-                }
-                assert_eq!(framebuffer.get_color((x, y)), BLACK);
-            }
-        }
-        assert_eq!(framebuffer.get_color((1, 1)), WHITE);
+        assert_eq!(fragments, [vec2(1.0, 1.0)]);
     }
 
     #[test]
     pub fn top_left_rule() {
-        let mut framebuffer = Framebuffer::new(3, 3);
-        framebuffer.clear(BLACK);
+        let mut fragments = Vec::new();
 
-        fill_triangle(
-            &mut framebuffer,
-            &[vertex(0.5, 0.5), vertex(2.5, 2.5), vertex(2.5, 0.5)],
+        rasterize_solid_triangle(
+            &[vec2(0.5, 0.5), vec2(2.5, 2.5), vec2(2.5, 0.5)],
+            |coords, _| fragments.push(coords),
         );
 
-        assert_eq!(framebuffer.get_color((0, 0)), WHITE);
-        assert_eq!(framebuffer.get_color((1, 0)), WHITE);
-        assert_eq!(framebuffer.get_color((2, 0)), BLACK);
-        assert_eq!(framebuffer.get_color((0, 1)), BLACK);
-        assert_eq!(framebuffer.get_color((1, 1)), WHITE);
-        assert_eq!(framebuffer.get_color((2, 1)), BLACK);
-        assert_eq!(framebuffer.get_color((0, 2)), BLACK);
-        assert_eq!(framebuffer.get_color((1, 2)), BLACK);
-        assert_eq!(framebuffer.get_color((2, 2)), BLACK);
+        assert_eq!(fragments, [vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(1.0, 1.0)]);
     }
 }

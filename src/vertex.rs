@@ -1,9 +1,9 @@
-use nalgebra_glm::Vec2;
+use nalgebra_glm::{Vec2, Vec3};
 
 use crate::color::Color;
 
 pub trait Vertex: Sized {
-    fn fragment_color(vertices: &[Self; 3], u: f32, v: f32) -> Color;
+    fn fragment_color(vertices: &[Self; 3], uvw: Vec3) -> Color;
 
     fn coords(&self) -> &Vec2;
 }
@@ -22,9 +22,8 @@ impl BasicVertex2D {
 
 impl Vertex for BasicVertex2D {
     #[inline]
-    fn fragment_color([v0, v1, v2]: &[Self; 3], u: f32, v: f32) -> Color {
-        let w = 1.0 - u - v;
-        return u * v0.color + v * v1.color + w * v2.color;
+    fn fragment_color([v0, v1, v2]: &[Self; 3], uvw: Vec3) -> Color {
+        uvw.x * v0.color + uvw.y * v1.color + uvw.z * v2.color
     }
 
     #[inline]

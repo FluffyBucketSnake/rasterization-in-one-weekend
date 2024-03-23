@@ -3,8 +3,9 @@ use std::f32::consts::PI;
 use minifb::{Key, KeyRepeat, Window, WindowOptions};
 use nalgebra_glm::vec3;
 use rasterization_in_a_weekend::{
-    color::{BLUE, GREEN, RED},
+    color::{BLUE, GREEN, RED, WHITE},
     framebuffer::Framebuffer,
+    model::unit_cube,
     pipeline::RasterizationPipeline,
     vertex::{BasicVertex3D, Vertex},
     viewport::Viewport,
@@ -29,7 +30,7 @@ fn main() {
     let world = nalgebra_glm::translate(&nalgebra_glm::identity(), &vec3(50.0, 50.0, 50.0))
         * nalgebra_glm::scale(&nalgebra_glm::identity(), &vec3(50.0, 50.0, 50.0));
     let view = nalgebra_glm::look_at_rh(
-        &vec3(50.0, 50.0, 0.0),
+        &vec3(0.0, 0.0, 0.0),
         &vec3(50.0, 50.0, 50.0),
         &vec3(0.0, -1.0, 0.0),
     );
@@ -42,15 +43,11 @@ fn main() {
     let transform = projection * view * world;
     let pipeline = RasterizationPipeline::new(transform, viewport);
 
-    let vertices = [
-        BasicVertex3D::new(vec3(0.5, 0.0, 0.0), RED),
-        BasicVertex3D::new(vec3(-0.5, -0.5, 0.0), GREEN),
-        BasicVertex3D::new(vec3(-0.5, 0.5, 0.0), BLUE),
-    ];
-    println!("{:?}", vertices.clone().map(|v| transform * v.coords()));
+    let mut colors = std::iter::repeat([RED, GREEN, BLUE, WHITE]).flatten();
+    let vertices = unit_cube(|_, c| BasicVertex3D::new(c, colors.next().unwrap()));
 
     while window.is_open() && !window.is_key_pressed(Key::Escape, KeyRepeat::No) {
-        pipeline.draw_triangle(&mut framebuffer, &vertices);
+        pipeline.draw_triangles(&mut framebuffer, &vertices);
         framebuffer.update_window(&mut window);
     }
 }

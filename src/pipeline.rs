@@ -27,16 +27,20 @@ impl RasterizationPipeline {
         self.transform = transform;
     }
 
-    pub fn draw_triangle<V: Vertex>(&self, framebuffer: &mut Framebuffer, vertices: &[V; 3]) {
-        let coords = [0, 1, 2]
-            .map(|i| vertices[i].coords())
-            .map(|c| self.transform * c)
-            .map(|c| self.viewport.ndc_to_framebuffer(c.xy()));
-        rasterize_solid_triangle(&coords, |coords, uvw| {
-            framebuffer.set_color_safe(
-                (coords.x as usize, coords.y as usize),
-                Vertex::fragment_color(vertices, uvw),
-            )
-        });
+    pub fn draw_triangles<V: Vertex>(&self, framebuffer: &mut Framebuffer, vertices: &[V]) {
+        for triangle in vertices.chunks(3) {
+            let vertices: &[V; 3] = triangle.try_into().unwrap();
+            let coords = [0, 1, 2]
+                .map(|i| vertices[i].coords())
+                .map(|c| self.transform * c)
+                .map(|c| self.viewport.ndc_to_framebuffer(c.xy()));
+
+            rasterize_solid_triangle(&coords, |coords, uvw| {
+                framebuffer.set_color_safe(
+                    (coords.x as usize, coords.y as usize),
+                    Vertex::fragment_color(vertices, uvw),
+                )
+            });
+        }
     }
 }

@@ -5,6 +5,7 @@ use rasterization_in_a_weekend::{
     framebuffer::Framebuffer,
     pipeline::RasterizationPipeline,
     vertex::BasicVertex2D,
+    viewport::Viewport,
 };
 
 const WINDOW_TITLE: &str = "Rasterization in One Weekend";
@@ -22,15 +23,16 @@ fn main() {
     .unwrap();
     window.limit_update_rate(Some(std::time::Duration::from_micros(1000 / 60)));
 
-    let pipeline = RasterizationPipeline;
+    let pipeline =
+        RasterizationPipeline::new(Viewport::full(WINDOW_WIDTH as f32, WINDOW_HEIGHT as f32));
 
     let vertices = [
-        BasicVertex2D::new(vec2(480.0, 180.0), RED),
-        BasicVertex2D::new(vec2(160.0, 90.0), GREEN),
-        BasicVertex2D::new(vec2(160.0, 270.0), BLUE),
+        BasicVertex2D::new(vec2(0.5, 0.0), RED),
+        BasicVertex2D::new(vec2(-0.5, -0.5), GREEN),
+        BasicVertex2D::new(vec2(-0.5, 0.5), BLUE),
     ];
     while window.is_open() && !window.is_key_pressed(Key::Escape, KeyRepeat::No) {
-        pipeline.draw_triangles(&mut framebuffer, &vertices);
+        pipeline.draw_triangle(&mut framebuffer, &vertices);
         framebuffer.update_window(&mut window);
     }
 }

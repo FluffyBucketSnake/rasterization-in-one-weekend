@@ -35,21 +35,22 @@ pub fn unit_cube<V: Clone>(mut f: impl FnMut(CubeSide, Vec3) -> V) -> [V; 36] {
     use nalgebra_glm::identity;
 
     let transform = nalgebra_glm::rotate_x(&identity(), PI / 2.0).fixed_resize::<3, 3>(0.0);
-    let top = unit_quad(|coords| f(CubeSide::Top, transform * coords.push(-0.5)));
+    let top = unit_quad(|coords| f(CubeSide::Top, transform * coords.push(0.5)));
 
     let transform = nalgebra_glm::rotate_y(&identity(), -PI / 2.0).fixed_resize::<3, 3>(0.0);
-    let left = unit_quad(|coords| f(CubeSide::Left, transform * coords.push(-0.5)));
+    let left = unit_quad(|coords| f(CubeSide::Left, transform * coords.push(0.5)));
 
     let transform = nalgebra_glm::rotate_x(&identity(), -PI / 2.0).fixed_resize::<3, 3>(0.0);
-    let bottom = unit_quad(|coords| f(CubeSide::Bottom, transform * coords.push(-0.5)));
+    let bottom = unit_quad(|coords| f(CubeSide::Bottom, transform * coords.push(0.5)));
 
     let transform = nalgebra_glm::rotate_y(&identity(), PI / 2.0).fixed_resize::<3, 3>(0.0);
-    let right = unit_quad(|coords| f(CubeSide::Right, transform * coords.push(-0.5)));
+    let right = unit_quad(|coords| f(CubeSide::Right, transform * coords.push(0.5)));
 
     let transform = nalgebra_glm::rotate_x(&identity(), PI).fixed_resize::<3, 3>(0.0);
-    let forward = unit_quad(|coords| f(CubeSide::Forward, transform * coords.push(-0.5)));
+    let forward = unit_quad(|coords| f(CubeSide::Forward, transform * coords.push(0.5)));
 
-    let backward = unit_quad(|coords| f(CubeSide::Forward, coords.push(-0.5)));
+    let transform = identity();
+    let backward = unit_quad(|coords| f(CubeSide::Backward, transform * coords.push(0.5)));
 
     let mut iter = top
         .into_iter()

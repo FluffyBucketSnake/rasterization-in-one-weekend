@@ -33,6 +33,7 @@ impl RasterizationPipeline {
             let coords = [0, 1, 2]
                 .map(|i| vertices[i].coords())
                 .map(|c| self.transform * c)
+                .map(|c| c / c.w)
                 .map(|c| self.viewport.ndc_to_framebuffer(c.xy()));
 
             rasterize_solid_triangle(&coords, |coords, uvw| {

@@ -1,7 +1,9 @@
+pub mod clipping;
 pub mod color;
 pub mod framebuffer;
 pub mod model;
 pub mod pipeline;
 pub mod rasterization;
+pub mod triangulation;
 pub mod vertex;
 pub mod viewport;

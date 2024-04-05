@@ -1,8 +1,9 @@
 use nalgebra_glm::{Mat4, Vec3, Vec4};
 
 use crate::{
-    clipping::clip_triangle, framebuffer::Framebuffer, rasterization::rasterize_solid_triangle,
-    triangulation::fan_triangulate, vertex::Vertex, viewport::Viewport,
+    clipping::clip_triangle, color::WHITE, framebuffer::Framebuffer,
+    rasterization::rasterize_solid_triangle, triangulation::fan_triangulate, vertex::Vertex,
+    viewport::Viewport,
 };
 
 #[derive(Debug)]
@@ -49,16 +50,21 @@ impl RasterizationPipeline {
 
         let primitive_count = clip_coords.len() / 3;
         for j in 0..primitive_count {
-            let coords = [0, 1, 2]
-                .map(|i| clip_coords[j * 3 + i])
-                .map(|c| c / c.w)
+            let ndc_coords = [0, 1, 2].map(|i| clip_coords[j * 3 + i]).map(|c| c / c.w);
+            let screen_coords = ndc_coords
+                .clone()
                 .map(|c| self.viewport.ndc_to_framebuffer(c.xy()));
             let colors = [0, 1, 2].map(|i| clip_colors[j * 3 + i]);
-            rasterize_solid_triangle(&coords, |coords, uvw| {
-                framebuffer.set_color_safe(
-                    (coords.x as usize, coords.y as usize),
-                    uvw.x * colors[0] + uvw.y * colors[1] + uvw.z * colors[2],
-                )
+            rasterize_solid_triangle(&screen_coords, |screen_coords, uvw| {
+                let screen_coords = (screen_coords.x as usize, screen_coords.y as usize);
+                let z = uvw.x * ndc_coords[0].z + uvw.y * ndc_coords[1].z + uvw.z * ndc_coords[2].z;
+                if framebuffer.test_and_set_depth_safe(screen_coords, z) {
+                    framebuffer.set_color(
+                        screen_coords,
+                        uvw.x * colors[0] + uvw.y * colors[1] + uvw.z * colors[2],
+                        // 100.0 * (1.0 - z) * WHITE,
+                    );
+                }
             });
         }
     }

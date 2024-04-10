@@ -1,6 +1,6 @@
 use nalgebra_glm::{lerp, Vec3, Vec4};
 
-pub fn clip_triangle(input_vertices: [Vec4; 3]) -> Vec<(Vec4, Vec3)> {
+pub fn clip_triangle(input_vertices: &[Vec4; 3]) -> Vec<(Vec4, Vec3)> {
     const PLANES: [(f32, Vec4); 6] = [
         (1.0, Vec4::new(1.0, 0.0, 0.0, 0.0)),
         (1.0, Vec4::new(-1.0, 0.0, 0.0, 0.0)),
@@ -17,7 +17,7 @@ pub fn clip_triangle(input_vertices: [Vec4; 3]) -> Vec<(Vec4, Vec3)> {
     ];
 
     let mut buffer_vertices = Vec::with_capacity(3 + PLANES.len());
-    buffer_vertices.extend(input_vertices.into_iter().zip(WEIGHTS));
+    buffer_vertices.extend(input_vertices.into_iter().copied().zip(WEIGHTS));
     let mut input_vertices = Vec::new();
     for (d, normal) in PLANES {
         input_vertices.clone_from(&buffer_vertices);

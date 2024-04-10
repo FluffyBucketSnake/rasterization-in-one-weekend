@@ -7,6 +7,7 @@ use rasterization_in_a_weekend::{
     framebuffer::Framebuffer,
     model::unit_cube,
     pipeline::RasterizationPipeline,
+    shaders::{BasicFragmentShader, BasicUniform, BasicVertexShader},
     vertex::BasicVertex3D,
     viewport::Viewport,
 };
@@ -42,19 +43,20 @@ fn main() {
     let proj_view = projection * view;
     let default_world = nalgebra_glm::scale(
         &nalgebra_glm::translate(&nalgebra_glm::identity(), &vec3(0.0, 0.0, 10.0)),
-        &vec3(5.0, 5.0, 5.0),
+        &vec3(2.0, 2.0, 2.0),
     );
-    let transform = proj_view * default_world;
-    let mut pipeline = RasterizationPipeline::new(transform, viewport);
+    let mut uniforms = BasicUniform {
+        transform: proj_view * default_world,
+    };
+    let pipeline = RasterizationPipeline::new(viewport, BasicVertexShader, BasicFragmentShader);
 
     let mut colors = std::iter::repeat([RED, GREEN, BLUE, WHITE]).flatten();
-    let vertices =
-        unit_cube(|_, c| BasicVertex3D::new(c - vec3(0.0, 2.0, 0.0), colors.next().unwrap()))
-            .into_iter()
-            .chain(unit_cube(|_, c| {
-                BasicVertex3D::new(c + vec3(0.0, 2.0, 0.0), colors.next().unwrap())
-            }))
-            .collect::<Vec<_>>();
+    let vertices = unit_cube(|_, c| BasicVertex3D(c - vec3(0.0, 2.0, 0.0), colors.next().unwrap()))
+        .into_iter()
+        .chain(unit_cube(|_, c| {
+            BasicVertex3D(c + vec3(0.0, 2.0, 0.0), colors.next().unwrap())
+        }))
+        .collect::<Vec<_>>();
 
     let amplitude = 1.0;
     let speed = PI / 60.0;
@@ -69,9 +71,8 @@ fn main() {
             &nalgebra_glm::translate(&default_world, &vec3(0.0, 0.0, z_delta)),
             angle,
         );
-        let transform = proj_view * world;
-        pipeline.set_transform(transform);
-        pipeline.draw_triangles(&mut framebuffer, &vertices);
+        uniforms.transform = proj_view * world;
+        pipeline.draw_triangles(&mut framebuffer, &uniforms, &vertices);
         framebuffer.update_window(&mut window);
         frame += 1;
     }

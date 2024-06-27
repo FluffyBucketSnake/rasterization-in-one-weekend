@@ -1,13 +1,13 @@
 use nalgebra_glm::{lerp, Vec3, Vec4};
 
 pub fn clip_triangle(input_vertices: &[Vec4; 3]) -> Vec<(Vec4, Vec3)> {
-    const PLANES: [(f32, Vec4); 6] = [
-        (1.0, Vec4::new(1.0, 0.0, 0.0, 0.0)),
-        (1.0, Vec4::new(-1.0, 0.0, 0.0, 0.0)),
-        (1.0, Vec4::new(0.0, 1.0, 0.0, 0.0)),
-        (1.0, Vec4::new(0.0, -1.0, 0.0, 0.0)),
-        (0.0, Vec4::new(0.0, 0.0, 1.0, 0.0)),
-        (1.0, Vec4::new(0.0, 0.0, -1.0, 0.0)),
+    const PLANES: [Vec4; 6] = [
+        Vec4::new(1.0, 0.0, 0.0, 1.0),
+        Vec4::new(-1.0, 0.0, 0.0, 1.0),
+        Vec4::new(0.0, 1.0, 0.0, 1.0),
+        Vec4::new(0.0, -1.0, 0.0, 1.0),
+        Vec4::new(0.0, 0.0, 1.0, 0.0),
+        Vec4::new(0.0, 0.0, -1.0, 1.0),
     ];
 
     const WEIGHTS: [Vec3; 3] = [
@@ -19,7 +19,7 @@ pub fn clip_triangle(input_vertices: &[Vec4; 3]) -> Vec<(Vec4, Vec3)> {
     let mut buffer_vertices = Vec::with_capacity(3 + PLANES.len());
     buffer_vertices.extend(input_vertices.into_iter().copied().zip(WEIGHTS));
     let mut input_vertices = Vec::new();
-    for (d, normal) in PLANES {
+    for plane in PLANES {
         input_vertices.clone_from(&buffer_vertices);
         buffer_vertices.clear();
 
@@ -29,15 +29,12 @@ pub fn clip_triangle(input_vertices: &[Vec4; 3]) -> Vec<(Vec4, Vec3)> {
 
         let mut j = input_vertices.len() - 1;
         for i in 0..input_vertices.len() {
-            let (coords_i, weights_i) = input_vertices[i];
             let (coords_j, weights_j) = input_vertices[j];
-            let hcoords_i = coords_i / coords_i.w;
-            let hcoords_j = coords_j / coords_j.w;
+            let (coords_i, weights_i) = input_vertices[i];
 
-            let distance_i = hcoords_i.dot(&normal) + d;
-            let distance_j = hcoords_j.dot(&normal) + d;
-
-            let alpha = -distance_j / (hcoords_i - hcoords_j).dot(&normal);
+            let distance_j = coords_j.dot(&plane);
+            let distance_i = coords_i.dot(&plane);
+            let alpha = distance_j / (distance_j - distance_i);
             let intersection = (
                 lerp(&coords_j, &coords_i, alpha),
                 lerp(&weights_j, &weights_i, alpha),
@@ -84,7 +81,7 @@ mod tests {
         ];
 
         for triangle in triangles {
-            let (coords, weights) = clip_triangle(triangle)
+            let (coords, weights) = clip_triangle(&triangle)
                 .into_iter()
                 .unzip::<Vec4, Vec3, Vec<_>, Vec<_>>();
 
@@ -140,7 +137,7 @@ mod tests {
 
         for (input, expected_output) in test_cases {
             assert_eq!(
-                clip_triangle(input),
+                clip_triangle(&input),
                 expected_output,
                 "Wrong clipping for triangle {:?}",
                 input

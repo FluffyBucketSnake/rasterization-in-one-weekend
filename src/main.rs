@@ -1,10 +1,11 @@
 use std::f32::consts::PI;
 
 use minifb::{Key, KeyRepeat, Window, WindowOptions};
-use nalgebra_glm::vec3;
+use nalgebra_glm::{vec2, vec3, Vec2};
 use rasterization_in_a_weekend::{
     color::{BLACK, BLUE, GREEN, RED, WHITE},
     framebuffer::Framebuffer,
+    image::Image,
     model::unit_cube,
     pipeline::RasterizationPipeline,
     vertex::Vertex,
@@ -26,6 +27,7 @@ fn main() {
     .unwrap();
     window.set_target_fps(60);
 
+    let image = Image::from_file("textures/simple.png".into()).unwrap();
     let viewport = Viewport::full(WINDOW_WIDTH as f32, WINDOW_HEIGHT as f32);
     let projection = nalgebra_glm::perspective_fov_rh_zo(
         PI / 3.0,
@@ -46,12 +48,29 @@ fn main() {
     );
     let pipeline = RasterizationPipeline::new(viewport);
     let mut colors = std::iter::repeat([RED, GREEN, BLUE, WHITE]).flatten();
-    let vertices = unit_cube(|_, c| Vertex::new(c - vec3(0.0, 2.0, 0.0), colors.next().unwrap()))
-        .into_iter()
-        .chain(unit_cube(|_, c| {
-            Vertex::new(c + vec3(0.0, 2.0, 0.0), colors.next().unwrap())
-        }))
-        .collect::<Vec<_>>();
+    let mut uv = std::iter::repeat([
+        vec2(0.0, 0.0),
+        vec2(0.0, 1.0),
+        vec2(1.0, 1.0),
+        vec2(1.0, 0.0),
+    ])
+    .flatten();
+    let vertices = unit_cube(|_, c| {
+        Vertex::new(
+            c - vec3(0.0, 2.0, 0.0),
+            colors.next().unwrap(),
+            uv.next().unwrap(),
+        )
+    })
+    .into_iter()
+    .chain(unit_cube(|_, c| {
+        Vertex::new(
+            c + vec3(0.0, 2.0, 0.0),
+            colors.next().unwrap(),
+            uv.next().unwrap(),
+        )
+    }))
+    .collect::<Vec<_>>();
 
     let amplitude = 1.0;
     let speed = PI / 60.0;
@@ -67,7 +86,7 @@ fn main() {
             angle,
         );
         let transform = proj_view * world;
-        pipeline.draw_triangles(&mut framebuffer, &transform, &vertices);
+        pipeline.draw_triangles(&mut framebuffer, &transform, &image, &vertices);
         framebuffer.update_window(&mut window);
         frame += 1;
     }

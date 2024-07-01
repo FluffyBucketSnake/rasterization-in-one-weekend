@@ -2,7 +2,10 @@ use std::ops::RangeBounds;
 
 use minifb::Window;
 
-use crate::color::{from_raw_color, to_raw_color, Color};
+use crate::{
+    color::{from_raw_color, to_raw_color, Color},
+    image::map_coords_to_index,
+};
 
 pub struct Framebuffer {
     color_attachment: Vec<u32>,
@@ -34,7 +37,7 @@ impl Framebuffer {
     }
 
     pub fn test_and_set_depth(&mut self, coords: (usize, usize), depth: f32) -> bool {
-        let target = &mut self.depth_attachment[coords_to_index(coords, self.width)];
+        let target = &mut self.depth_attachment[map_coords_to_index(coords, self.width)];
         if depth < *target {
             *target = depth;
             return true;
@@ -43,7 +46,7 @@ impl Framebuffer {
     }
 
     pub fn set_color(&mut self, coords: (usize, usize), color: Color) {
-        self.color_attachment[coords_to_index(coords, self.width)] = to_raw_color(color);
+        self.color_attachment[map_coords_to_index(coords, self.width)] = to_raw_color(color);
     }
 
     pub fn set_color_safe(&mut self, coords: (usize, usize), color: Color) {
@@ -54,7 +57,7 @@ impl Framebuffer {
     }
 
     pub fn get_color(&self, coords: (usize, usize)) -> Color {
-        from_raw_color(self.color_attachment[coords_to_index(coords, self.width)])
+        from_raw_color(self.color_attachment[map_coords_to_index(coords, self.width)])
     }
 
     pub fn update_window(&self, window: &mut Window) {
@@ -74,8 +77,4 @@ impl Framebuffer {
     pub fn contains(&self, coords: (usize, usize)) -> bool {
         coords.0 < self.width && coords.1 < self.height
     }
-}
-
-fn coords_to_index(coords: (usize, usize), width: usize) -> usize {
-    coords.1 * width + coords.0
 }

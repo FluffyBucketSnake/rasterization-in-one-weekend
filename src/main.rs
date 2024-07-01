@@ -1,4 +1,4 @@
-use std::f32::consts::PI;
+use std::{f32::consts::PI, io::Write, time::Duration};
 
 use minifb::{Key, KeyRepeat, Window, WindowOptions};
 use nalgebra_glm::vec3;
@@ -25,7 +25,7 @@ fn main() {
         WindowOptions::default(),
     )
     .unwrap();
-    window.limit_update_rate(Some(std::time::Duration::from_micros(1000 / 60)));
+    window.set_target_fps(60);
 
     let viewport = Viewport::full(WINDOW_WIDTH as f32, WINDOW_HEIGHT as f32);
     let projection = nalgebra_glm::perspective_fov_rh_zo(
@@ -63,6 +63,7 @@ fn main() {
     let rotation = PI / 150.0;
     let mut frame = 0;
     while window.is_open() && !window.is_key_pressed(Key::Escape, KeyRepeat::No) {
+        let start_time = std::time::Instant::now();
         framebuffer.clear(BLACK, std::f32::INFINITY);
         let f32_frame = frame as f32;
         let angle = f32_frame * rotation;
@@ -75,5 +76,9 @@ fn main() {
         pipeline.draw_triangles(&mut framebuffer, &uniforms, &vertices);
         framebuffer.update_window(&mut window);
         frame += 1;
+        let delta = std::time::Instant::now() - start_time;
+        let fps = (1.0 / delta.as_secs_f64()).min(60.00);
+        print!("\x1b[2K\r{:.2} FPS\n\x1b[A", fps);
     }
+    println!();
 }

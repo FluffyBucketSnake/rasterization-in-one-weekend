@@ -7,7 +7,7 @@ use rasterization_in_a_weekend::{
     framebuffer::Framebuffer,
     model::unit_cube,
     pipeline::RasterizationPipeline,
-    vertex::BasicVertex3D,
+    vertex::Vertex,
     viewport::Viewport,
 };
 
@@ -46,13 +46,12 @@ fn main() {
     );
     let pipeline = RasterizationPipeline::new(viewport);
     let mut colors = std::iter::repeat([RED, GREEN, BLUE, WHITE]).flatten();
-    let vertices =
-        unit_cube(|_, c| BasicVertex3D::new(c - vec3(0.0, 2.0, 0.0), colors.next().unwrap()))
-            .into_iter()
-            .chain(unit_cube(|_, c| {
-                BasicVertex3D::new(c + vec3(0.0, 2.0, 0.0), colors.next().unwrap())
-            }))
-            .collect::<Vec<_>>();
+    let vertices = unit_cube(|_, c| Vertex::new(c - vec3(0.0, 2.0, 0.0), colors.next().unwrap()))
+        .into_iter()
+        .chain(unit_cube(|_, c| {
+            Vertex::new(c + vec3(0.0, 2.0, 0.0), colors.next().unwrap())
+        }))
+        .collect::<Vec<_>>();
 
     let amplitude = 1.0;
     let speed = PI / 60.0;

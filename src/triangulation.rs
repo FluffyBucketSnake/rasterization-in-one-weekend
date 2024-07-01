@@ -1,6 +1,6 @@
-use nalgebra_glm::Vec4;
+use crate::vertex::Vertex;
 
-pub fn fan_triangulate<T: Copy>(vertices: &[(Vec4, T)]) -> Vec<(Vec4, T)> {
+pub fn fan_triangulate(vertices: &[Vertex]) -> Vec<Vertex> {
     if vertices.len() < 3 {
         return vec![];
     }
@@ -16,4 +16,3 @@ pub fn fan_triangulate<T: Copy>(vertices: &[(Vec4, T)]) -> Vec<(Vec4, T)> {
     }
     return output_vertices;
 }
-

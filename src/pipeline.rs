@@ -15,49 +15,43 @@ impl RasterizationPipeline {
         Self { viewport }
     }
 
-    pub fn draw_triangles<V: Vertex>(
+    pub fn draw_triangles(
         &self,
         framebuffer: &mut Framebuffer,
         transform: &Mat4,
-        vertices: &[V],
+        vertices: &[Vertex],
     ) {
         let primitive_count = vertices.len() / 3;
-        let mut clip_coords = Vec::new();
-        let mut clip_colors = Vec::new();
         for i in 0..primitive_count {
-            let coords = [0, 1, 2]
-                .map(|j| vertices[3 * i + j].coords())
-                .map(|c| transform * c);
-            let colors = [0, 1, 2].map(|j| vertices[3 * i + j].color());
-            let (coords, weights) = fan_triangulate(&clip_triangle(&coords))
-                .into_iter()
-                .unzip::<Vec4, Vec3, Vec<_>, Vec<_>>();
-            clip_coords.extend(coords);
-            clip_colors.extend(
-                weights
-                    .into_iter()
-                    .map(|w| w.x * colors[0] + w.y * colors[1] + w.z * colors[2]),
-            );
-        }
-
-        let primitive_count = clip_coords.len() / 3;
-        for j in 0..primitive_count {
-            let ndc_coords = [0, 1, 2].map(|i| clip_coords[j * 3 + i]).map(|c| c / c.w);
-            let screen_coords = ndc_coords
-                .clone()
-                .map(|c| self.viewport.ndc_to_framebuffer(c.xy()));
-            let colors = [0, 1, 2].map(|i| clip_colors[j * 3 + i]);
-            rasterize_solid_triangle(&screen_coords, |screen_coords, uvw| {
-                let screen_coords = (screen_coords.x as usize, screen_coords.y as usize);
-                let z = uvw.x * ndc_coords[0].z + uvw.y * ndc_coords[1].z + uvw.z * ndc_coords[2].z;
-                if framebuffer.test_and_set_depth_safe(screen_coords, z) {
-                    framebuffer.set_color(
-                        screen_coords,
-                        uvw.x * colors[0] + uvw.y * colors[1] + uvw.z * colors[2],
-                        // 100.0 * (1.0 - z) * WHITE,
-                    );
-                }
-            });
+            let triangle = [0, 1, 2]
+                .map(|j| vertices[3 * i + j])
+                .map(|v| v.transform(transform));
+            let clipped_polygon = clip_triangle(&triangle);
+            let clipped_triangles = fan_triangulate(&clipped_polygon);
+            let primitive_count = clipped_triangles.len() / 3;
+            for i in 0..primitive_count {
+                let ndc_triangle = [0, 1, 2]
+                    .map(|j| clipped_triangles[3 * i + j])
+                    .map(|v| v.homogenize());
+                let screen_coords = [0, 1, 2].map(|i| {
+                    self.viewport
+                        .ndc_to_framebuffer(ndc_triangle[i].coords.xy())
+                });
+                rasterize_solid_triangle(&screen_coords, |screen_coords, uvw| {
+                    let screen_coords = (screen_coords.x as usize, screen_coords.y as usize);
+                    let z = uvw.x * ndc_triangle[0].coords.z
+                        + uvw.y * ndc_triangle[1].coords.z
+                        + uvw.z * ndc_triangle[2].coords.z;
+                    if framebuffer.test_and_set_depth_safe(screen_coords, z) {
+                        framebuffer.set_color(
+                            screen_coords,
+                            uvw.x * ndc_triangle[0].color
+                                + uvw.y * ndc_triangle[1].color
+                                + uvw.z * ndc_triangle[2].color,
+                        );
+                    }
+                });
+            }
         }
     }
 }

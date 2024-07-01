@@ -42,7 +42,7 @@ fn main() {
     let proj_view = projection * view;
     let default_world = nalgebra_glm::scale(
         &nalgebra_glm::translate(&nalgebra_glm::identity(), &vec3(0.0, 0.0, 10.0)),
-        &vec3(5.0, 5.0, 5.0),
+        &vec3(2.0, 2.0, 2.0),
     );
     let pipeline = RasterizationPipeline::new(viewport);
     let mut colors = std::iter::repeat([RED, GREEN, BLUE, WHITE]).flatten();

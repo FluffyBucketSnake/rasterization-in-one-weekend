@@ -38,6 +38,7 @@ impl Image {
     }
 
     pub fn get_color(&self, coords: Coords2D) -> Color {
+        assert!(self.contains(coords));
         from_raw_color(self.buffer[map_coords_to_index(coords, self.width)])
     }
 

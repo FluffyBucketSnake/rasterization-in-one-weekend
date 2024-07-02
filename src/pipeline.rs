@@ -1,7 +1,7 @@
-use nalgebra_glm::{vec2, Mat4, Vec3, Vec4};
+use nalgebra_glm::{vec2, Mat4, Vec2, Vec3, Vec4};
 
 use crate::{
-    clipping::clip_triangle, framebuffer::Framebuffer, image::Image,
+    clipping::clip_triangle, color::Color, framebuffer::Framebuffer, image::Image,
     rasterization::rasterize_solid_triangle, triangulation::fan_triangulate, vertex::Vertex,
     viewport::Viewport,
 };
@@ -41,19 +41,22 @@ impl RasterizationPipeline {
                 });
                 rasterize_solid_triangle(&screen_coords, |screen_coords, uvw| {
                     let screen_coords = (screen_coords.x as usize, screen_coords.y as usize);
-                    let Vertex { coords, uv } =
+                    let Vertex { coords, uv, .. } =
                         ndc_triangle[0].bary_lerp(&ndc_triangle[1], &ndc_triangle[2], uvw);
                     if framebuffer.test_and_set_depth_safe(screen_coords, coords.z) {
-                        let [image_coord_x, image_coord_y] = uv
-                            .component_mul(&vec2(image.width(), image.height()).cast())
-                            .try_cast::<usize>()
-                            .unwrap()
-                            .into();
-                        let sample = image.get_color((image_coord_x, image_coord_y));
-                        framebuffer.set_color(screen_coords, sample);
+                        framebuffer.set_color(screen_coords, sample_image(image, &uv));
                     }
                 });
             }
         }
     }
+}
+
+pub fn sample_image(image: &Image, uv: &Vec2) -> Color {
+    let [image_coord_x, image_coord_y] =
+        nalgebra_glm::floor(&uv.component_mul(&vec2(image.width(), image.height()).cast())).into();
+    image.get_color((
+        (image_coord_x as usize).min(image.width() - 1),
+        (image_coord_y as usize).min(image.height() - 1),
+    ))
 }

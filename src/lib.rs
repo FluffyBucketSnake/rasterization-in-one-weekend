@@ -5,6 +5,7 @@ pub mod image;
 pub mod model;
 pub mod pipeline;
 pub mod rasterization;
+pub mod sampler;
 pub mod triangulation;
 pub mod vertex;
 pub mod viewport;

@@ -1,9 +1,9 @@
-use nalgebra_glm::{vec2, Mat4, Vec2, Vec3, Vec4};
+use nalgebra_glm::Mat4;
 
 use crate::{
-    clipping::clip_triangle, color::Color, framebuffer::Framebuffer, image::Image,
-    rasterization::rasterize_solid_triangle, triangulation::fan_triangulate, vertex::Vertex,
-    viewport::Viewport,
+    clipping::clip_triangle, framebuffer::Framebuffer, image::Image,
+    rasterization::rasterize_solid_triangle, sampler::Sampler, triangulation::fan_triangulate,
+    vertex::Vertex, viewport::Viewport,
 };
 
 #[derive(Debug)]
@@ -20,7 +20,7 @@ impl RasterizationPipeline {
         &self,
         framebuffer: &mut Framebuffer,
         transform: &Mat4,
-        image: &Image,
+        (image, sampler): (&Image, &Sampler),
         vertices: &[Vertex],
     ) {
         let primitive_count = vertices.len() / 3;
@@ -44,19 +44,10 @@ impl RasterizationPipeline {
                     let Vertex { coords, uv, .. } =
                         ndc_triangle[0].bary_lerp(&ndc_triangle[1], &ndc_triangle[2], uvw);
                     if framebuffer.test_and_set_depth_safe(screen_coords, coords.z) {
-                        framebuffer.set_color(screen_coords, sample_image(image, &uv));
+                        framebuffer.set_color(screen_coords, sampler.sample(image, uv));
                     }
                 });
             }
         }
     }
-}
-
-pub fn sample_image(image: &Image, uv: &Vec2) -> Color {
-    let [image_coord_x, image_coord_y] =
-        nalgebra_glm::floor(&uv.component_mul(&vec2(image.width(), image.height()).cast())).into();
-    image.get_color((
-        (image_coord_x as usize).min(image.width() - 1),
-        (image_coord_y as usize).min(image.height() - 1),
-    ))
 }

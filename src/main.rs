@@ -8,6 +8,7 @@ use rasterization_in_a_weekend::{
     image::Image,
     model::unit_cube,
     pipeline::RasterizationPipeline,
+    sampler::{AddressMode, Filter, Sampler},
     vertex::Vertex,
     viewport::Viewport,
 };
@@ -28,6 +29,7 @@ fn main() {
     window.set_target_fps(60);
 
     let image = Image::from_file("textures/simple.png".into()).unwrap();
+    let sampler = Sampler::new(AddressMode::Clamp, AddressMode::Clamp, Filter::Linear);
     let viewport = Viewport::full(WINDOW_WIDTH as f32, WINDOW_HEIGHT as f32);
     let projection = nalgebra_glm::perspective_fov_rh_zo(
         PI / 3.0,
@@ -86,7 +88,7 @@ fn main() {
             angle,
         );
         let transform = proj_view * world;
-        pipeline.draw_triangles(&mut framebuffer, &transform, &image, &vertices);
+        pipeline.draw_triangles(&mut framebuffer, &transform, (&image, &sampler), &vertices);
         framebuffer.update_window(&mut window);
         frame += 1;
     }

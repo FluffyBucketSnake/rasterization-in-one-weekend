@@ -1,9 +1,14 @@
 use nalgebra_glm::Mat4;
 
 use crate::{
-    clipping::clip_triangle, framebuffer::Framebuffer, image::Image,
-    rasterization::rasterize_solid_triangle, sampler::Sampler, triangulation::fan_triangulate,
-    vertex::Vertex, viewport::Viewport,
+    clipping::clip_triangle,
+    framebuffer::Framebuffer,
+    image::Image,
+    rasterization::{rasterize_solid_triangle, Fragment},
+    sampler::Sampler,
+    triangulation::fan_triangulate,
+    vertex::Vertex,
+    viewport::Viewport,
 };
 
 #[derive(Debug)]
@@ -39,14 +44,27 @@ impl RasterizationPipeline {
                     self.viewport
                         .ndc_to_framebuffer(ndc_triangle[i].coords.xy())
                 });
-                rasterize_solid_triangle(&screen_coords, |screen_coords, uvw| {
-                    let screen_coords = (screen_coords.x as usize, screen_coords.y as usize);
-                    let Vertex { coords, uv, .. } =
-                        ndc_triangle[0].bary_lerp(&ndc_triangle[1], &ndc_triangle[2], uvw);
-                    if framebuffer.test_and_set_depth_safe(screen_coords, coords.z) {
-                        framebuffer.set_color(screen_coords, sampler.sample(image, uv));
-                    }
-                });
+                let [v0, v1, v2] = ndc_triangle;
+                rasterize_solid_triangle(
+                    &screen_coords,
+                    |Fragment {
+                         coords,
+                         t,
+                         dt_dx,
+                         dt_dy,
+                     }| {
+                        let screen_coords = (coords.x as usize, coords.y as usize);
+                        let Vertex { coords, uv, .. } = v0.bary_lerp(&v1, &v2, t);
+                        let duv_dx = v0.duv(&v1, &v2, t, dt_dx);
+                        let duv_dy = v0.duv(&v1, &v2, t, dt_dy);
+                        if framebuffer.test_and_set_depth_safe(screen_coords, coords.z) {
+                            framebuffer.set_color(
+                                screen_coords,
+                                sampler.sample(image, uv, duv_dx, duv_dy),
+                            );
+                        }
+                    },
+                );
             }
         }
     }

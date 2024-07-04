@@ -5,7 +5,15 @@ type FVec2 = TVec2<FixedI28F4>;
 
 const EPSILON: FixedI28F4 = FixedI28F4::from_bits(0x01);
 
-pub fn rasterize_solid_triangle(vertices: &[Vec2; 3], mut f: impl FnMut(Vec2, Vec3)) {
+#[derive(Debug, Clone, Copy)]
+pub struct Fragment {
+    pub coords: TVec2<usize>,
+    pub t: Vec3,
+    pub dt_dx: Vec3,
+    pub dt_dy: Vec3,
+}
+
+pub fn rasterize_solid_triangle(vertices: &[Vec2; 3], mut f: impl FnMut(Fragment)) {
     let [c0, c1, c2] = vertices.clone().map(vec2_to_fvec2);
 
     let min = floor(&c0.inf(&c1.inf(&c2)));
@@ -17,28 +25,43 @@ pub fn rasterize_solid_triangle(vertices: &[Vec2; 3], mut f: impl FnMut(Vec2, Ve
         return;
     }
 
-    let u_bias = left_or_top_edge_bias(c1, c2, EPSILON);
-    let v_bias = left_or_top_edge_bias(c2, c0, EPSILON);
-    let w_bias = left_or_top_edge_bias(c0, c1, EPSILON);
     let half = FixedI28F4::from_bits(0b1000);
+    let offset = vec2(half, half);
 
+    let w_bias = vec3(
+        left_or_top_edge_bias(c1, c2, EPSILON),
+        left_or_top_edge_bias(c2, c0, EPSILON),
+        left_or_top_edge_bias(c0, c1, EPSILON),
+    );
+    let w_0 = vec3(
+        edge_function(c1, c2, min + offset),
+        edge_function(c2, c0, min + offset),
+        edge_function(c0, c1, min + offset),
+    ) + w_bias;
+    let dw_dx = vec3(c2.y - c1.y, c0.y - c2.y, c1.y - c0.y);
+    let dw_dy = vec3(c1.x - c2.x, c2.x - c0.x, c0.x - c1.x);
+
+    let dw_dx_f32 = dw_dx.map(|c| c.0.to_num()) / signed_area;
+    let dw_dy_f32 = dw_dy.map(|c| c.0.to_num()) / signed_area;
+
+    let mut w_y = w_0;
     let mut y = min.y;
     while y <= max.y {
+        let mut w = w_y;
         let mut x = min.x;
         while x <= max.x {
-            let p = vec2(x + half, y + half);
-            let u = edge_function(c1, c2, p) + u_bias;
-            let v = edge_function(c2, c0, p) + v_bias;
-            let w = edge_function(c0, c1, p) + w_bias;
-
-            if u >= num::zero() && v >= num::zero() && w >= num::zero() {
-                f(
-                    vec2(x, y).map(|c| c.0.to_num()),
-                    vec3(u, v, w).map(|c| c.0.to_num::<f32>()) / signed_area,
-                )
+            if w.x >= num::zero() && w.y >= num::zero() && w.z >= num::zero() {
+                f(Fragment {
+                    coords: vec2(x, y).map(|c| c.0.to_num()),
+                    t: w.map(|c| c.0.to_num::<f32>()) / signed_area,
+                    dt_dx: dw_dx_f32,
+                    dt_dy: dw_dy_f32,
+                })
             }
+            w += dw_dx;
             x += num::one();
         }
+        w_y += dw_dy;
         y += num::one();
     }
 }
@@ -75,10 +98,10 @@ mod test {
 
         rasterize_solid_triangle(
             &[vec2(1.25, 1.25), vec2(1.5, 1.75), vec2(1.75, 1.25)],
-            |coords, _| fragments.push(coords),
+            |Fragment { coords, .. }| fragments.push(coords),
         );
 
-        assert_eq!(fragments, [vec2(1.0, 1.0)]);
+        assert_eq!(fragments, [vec2(1, 1)]);
     }
 
     #[test]
@@ -87,9 +110,9 @@ mod test {
 
         rasterize_solid_triangle(
             &[vec2(0.5, 0.5), vec2(2.5, 2.5), vec2(2.5, 0.5)],
-            |coords, _| fragments.push(coords),
+            |Fragment { coords, .. }| fragments.push(coords),
         );
 
-        assert_eq!(fragments, [vec2(0.0, 0.0), vec2(1.0, 0.0), vec2(1.0, 1.0)]);
+        assert_eq!(fragments, [vec2(0, 0), vec2(1, 0), vec2(1, 1)]);
     }
 }

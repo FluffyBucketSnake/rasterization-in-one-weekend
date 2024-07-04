@@ -1,7 +1,7 @@
 use std::f32::consts::PI;
 
 use minifb::{Key, KeyRepeat, Window, WindowOptions};
-use nalgebra_glm::{vec2, vec3, Vec2};
+use nalgebra_glm::{vec2, vec3};
 use rasterization_in_a_weekend::{
     color::{BLACK, BLUE, GREEN, RED, WHITE},
     framebuffer::Framebuffer,
@@ -28,7 +28,7 @@ fn main() {
     .unwrap();
     window.set_target_fps(60);
 
-    let image = Image::from_file("textures/simple.png".into()).unwrap();
+    let image = Image::from_file("textures/historical.jpg".into()).unwrap();
     let sampler = Sampler::new(AddressMode::Clamp, AddressMode::Clamp, Filter::Linear);
     let viewport = Viewport::full(WINDOW_WIDTH as f32, WINDOW_HEIGHT as f32);
     let projection = nalgebra_glm::perspective_fov_rh_zo(

@@ -49,6 +49,16 @@ impl Vertex {
         }
     }
 
+    pub fn duv(&self, v1: &Self, v2: &Self, t: Vec3, dt: Vec3) -> Vec2 {
+        let v0 = self;
+        let coords = bary_lerp(v0.coords, v1.coords, v2.coords, t);
+        let w0 = v0.coords.w;
+        let w1 = v1.coords.w;
+        let w2 = v2.coords.w;
+        let w_t = coords.w;
+        return (v0.uv * w0 * dt[0] + v1.uv * w1 * dt[1] + v2.uv * w2 * dt[2]) / w_t;
+    }
+
     pub fn homogenize(mut self) -> Self {
         let w_inv = 1.0 / self.coords.w;
         self.coords *= w_inv;

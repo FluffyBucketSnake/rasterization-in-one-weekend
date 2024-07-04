@@ -1,7 +1,7 @@
-use std::ops::Mul;
+use std::ops::{Div, Mul};
 
 use nalgebra_glm::{Mat4, Vec2, Vec3, Vec4};
-use simba::scalar::ClosedAdd;
+use simba::scalar::{ClosedAdd, ClosedMul};
 
 use crate::color::Color;
 
@@ -44,19 +44,20 @@ impl Vertex {
         let w_t = coords.w;
         Self {
             coords,
-            color: bary_lerp(v0.color * w0, v1.color * w1, v2.color * w2, t) / w_t,
-            uv: bary_lerp(v0.uv * w0, v1.uv * w1, v2.uv * w2, t) / w_t,
+            color: bary_lerp_perp(v0.color, w0, v1.color, w1, v2.color, w2, t, w_t),
+            uv: bary_lerp_perp(v0.uv, w0, v1.uv, w1, v2.uv, w2, t, w_t),
         }
     }
 
     pub fn duv(&self, v1: &Self, v2: &Self, t: Vec3, dt: Vec3) -> Vec2 {
         let v0 = self;
-        let coords = bary_lerp(v0.coords, v1.coords, v2.coords, t);
         let w0 = v0.coords.w;
         let w1 = v1.coords.w;
         let w2 = v2.coords.w;
-        let w_t = coords.w;
-        return (v0.uv * w0 * dt[0] + v1.uv * w1 * dt[1] + v2.uv * w2 * dt[2]) / w_t;
+        let w_t0 = bary_lerp(v0.coords.w, v1.coords.w, v2.coords.w, t);
+        let w_t1 = bary_lerp(v0.coords.w, v1.coords.w, v2.coords.w, t + dt);
+        return bary_lerp_perp(v0.uv, w0, v1.uv, w1, v2.uv, w2, t + dt, w_t1)
+            - bary_lerp_perp(v0.uv, w0, v1.uv, w1, v2.uv, w2, t, w_t0);
     }
 
     pub fn homogenize(mut self) -> Self {
@@ -74,4 +75,13 @@ where
     T: ClosedAdd,
 {
     t.x * v0 + t.y * v1 + t.z * v2
+}
+
+#[inline]
+fn bary_lerp_perp<T>(v0: T, w0: f32, v1: T, w1: f32, v2: T, w2: f32, t: Vec3, w_t: f32) -> T
+where
+    f32: Mul<T, Output = T> + ClosedMul,
+    T: ClosedAdd + Div<f32, Output = T>,
+{
+    bary_lerp(w0 * v0, w1 * v1, w2 * v2, t) / w_t
 }

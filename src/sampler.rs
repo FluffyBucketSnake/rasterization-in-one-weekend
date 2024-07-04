@@ -65,17 +65,16 @@ impl Sampler {
                     let rs_min = rs - scale_factor / 2.0;
                     let mut color = Color::new(0.0, 0.0, 0.0);
                     let mut y = 0.0;
-                    let mut n = 0.0;
+                    let mut x = 0.0;
                     while y < scale_factor.y {
-                        let mut x = 0.0;
+                        x = 0.0;
                         while x < scale_factor.x {
                             color += self.linear_sample(image, rs_min + vec2(x, y));
                             x += 1.0;
-                            n += 1.0;
                         }
                         y += 1.0;
                     }
-                    return color / n;
+                    return color / (x * y);
                 }
             }
         } else {

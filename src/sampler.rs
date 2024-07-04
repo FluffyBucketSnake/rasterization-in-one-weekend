@@ -26,49 +26,66 @@ pub enum Filter {
 pub struct Sampler {
     u_address_mode: AddressMode,
     v_address_mode: AddressMode,
-    filter: Filter,
+    min_filter: Filter,
+    mag_filter: Filter,
 }
 
 impl Sampler {
-    pub fn new(u_address_mode: AddressMode, v_address_mode: AddressMode, filter: Filter) -> Self {
+    pub fn new(
+        u_address_mode: AddressMode,
+        v_address_mode: AddressMode,
+        min_filter: Filter,
+        mag_filter: Filter,
+    ) -> Self {
         Self {
             u_address_mode,
             v_address_mode,
-            filter,
+            min_filter,
+            mag_filter,
         }
     }
 
     pub fn sample(&self, image: &Image, uv: Vec2, duv_dx: Vec2, duv_dy: Vec2) -> Color {
         let image_scale = vec2(image.width(), image.height()).cast();
         let rs = uv.component_mul(&image_scale);
-        match self.filter {
-            Filter::Nearest => {
-                return self.nearest_sample(image, rs);
-            }
-            Filter::Linear => {
-                return self.linear_sample(image, rs);
-            }
-            Filter::Anisotropic(l) => {
-                let scale_factor = vec2(
-                    duv_dx.component_mul(&image_scale).norm(),
-                    duv_dy.component_mul(&image_scale).norm(),
-                )
-                .inf(&(vec2(1.0, 1.0) * 2.0.powi(l)))
-                .sup(&vec2(0.0, 0.0));
-                let rs_min = rs - scale_factor / 2.0;
-                let mut color = Color::new(0.0, 0.0, 0.0);
-                let mut y = 0.0;
-                let mut n = 0.0;
-                while y < scale_factor.y {
-                    let mut x = 0.0;
-                    while x < scale_factor.x {
-                        color += self.linear_sample(image, rs_min + vec2(x, y));
-                        x += 1.0;
-                        n += 1.0;
-                    }
-                    y += 1.0;
+        let scale_factor = vec2(
+            duv_dx.component_mul(&image_scale).norm(),
+            duv_dy.component_mul(&image_scale).norm(),
+        );
+        if scale_factor.min() > 1.0 {
+            match self.min_filter {
+                Filter::Nearest => {
+                    return self.nearest_sample(image, rs);
                 }
-                return color / n;
+                Filter::Linear => {
+                    return self.linear_sample(image, rs);
+                }
+                Filter::Anisotropic(l) => {
+                    let scale_factor = scale_factor.inf(&(vec2(1.0, 1.0) * 2.0.powi(l)));
+                    let rs_min = rs - scale_factor / 2.0;
+                    let mut color = Color::new(0.0, 0.0, 0.0);
+                    let mut y = 0.0;
+                    let mut n = 0.0;
+                    while y < scale_factor.y {
+                        let mut x = 0.0;
+                        while x < scale_factor.x {
+                            color += self.linear_sample(image, rs_min + vec2(x, y));
+                            x += 1.0;
+                            n += 1.0;
+                        }
+                        y += 1.0;
+                    }
+                    return color / n;
+                }
+            }
+        } else {
+            match self.mag_filter {
+                Filter::Nearest => {
+                    return self.nearest_sample(image, rs);
+                }
+                Filter::Linear | Filter::Anisotropic(_) => {
+                    return self.linear_sample(image, rs);
+                }
             }
         }
     }

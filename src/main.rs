@@ -29,7 +29,12 @@ fn main() {
     window.set_target_fps(60);
 
     let image = Image::from_file("textures/historical.jpg".into()).unwrap();
-    let sampler = Sampler::new(AddressMode::Clamp, AddressMode::Clamp, Filter::Linear);
+    let sampler = Sampler::new(
+        AddressMode::Clamp,
+        AddressMode::Clamp,
+        Filter::Anisotropic(4),
+        Filter::Linear,
+    );
     let viewport = Viewport::full(WINDOW_WIDTH as f32, WINDOW_HEIGHT as f32);
     let projection = nalgebra_glm::perspective_fov_rh_zo(
         PI / 3.0,

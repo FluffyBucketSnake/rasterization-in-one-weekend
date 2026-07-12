@@ -45,7 +45,7 @@ impl Sampler {
         }
     }
 
-    pub fn sample(&self, image: &Image, uv: Vec2, duv_dx: Vec2, duv_dy: Vec2) -> Color {
+    pub fn sample(&self, image: &Image<u32>, uv: Vec2, duv_dx: Vec2, duv_dy: Vec2) -> Color {
         let image_scale = vec2(image.width(), image.height()).cast();
         let rs = uv.component_mul(&image_scale);
         let scale_factor = vec2(
@@ -61,20 +61,7 @@ impl Sampler {
                     return self.linear_sample(image, rs);
                 }
                 Filter::Anisotropic(l) => {
-                    let scale_factor = scale_factor.inf(&(vec2(1.0, 1.0) * 2.0.powi(l)));
-                    let rs_min = rs - scale_factor / 2.0;
-                    let mut color = Color::new(0.0, 0.0, 0.0);
-                    let mut y = 0.0;
-                    let mut x = 0.0;
-                    while y < scale_factor.y {
-                        x = 0.0;
-                        while x < scale_factor.x {
-                            color += self.linear_sample(image, rs_min + vec2(x, y));
-                            x += 1.0;
-                        }
-                        y += 1.0;
-                    }
-                    return color / (x * y);
+                    return self.anisotropic_sample(image, rs, scale_factor.min().max(l as f32));
                 }
             }
         } else {
@@ -89,30 +76,57 @@ impl Sampler {
         }
     }
 
-    fn nearest_sample(&self, image: &Image, rs: Vec2) -> Color {
+    fn nearest_sample(&self, image: &Image<u32>, rs: Vec2) -> Color {
         let ij = nalgebra_glm::floor(&rs).try_cast().unwrap();
-        return self.sample_texel(image, ij);
+        return self.sample_texel(image, ij, 0);
     }
 
-    fn linear_sample(&self, image: &Image, rs: Vec2) -> Color {
+    fn linear_sample(&self, image: &Image<u32>, rs: Vec2) -> Color {
         let rs = rs - vec2(0.5, 0.5);
         let a = nalgebra_glm::fract(&rs);
-        let ij0 = nalgebra_glm::floor(&rs).try_cast().unwrap();
+        let ij_0 = nalgebra_glm::floor(&rs).try_cast().unwrap();
         let samples = [
-            (ij0 + vec2(0, 0), 1.0 - a.x, 1.0 - a.y),
-            (ij0 + vec2(1, 0), a.x, 1.0 - a.y),
-            (ij0 + vec2(0, 1), 1.0 - a.x, a.y),
-            (ij0 + vec2(1, 1), a.x, a.y),
+            (ij_0 + vec2(0, 0), 1.0 - a.x, 1.0 - a.y),
+            (ij_0 + vec2(1, 0), a.x, 1.0 - a.y),
+            (ij_0 + vec2(0, 1), 1.0 - a.x, a.y),
+            (ij_0 + vec2(1, 1), a.x, a.y),
         ];
         return samples
-            .map(|(ij, w_i, w_j)| w_i * w_j * self.sample_texel(image, ij))
+            .map(|(ij, w_i, w_j)| w_i * w_j * self.sample_texel(image, ij, 0))
             .into_iter()
             .sum();
     }
 
-    fn sample_texel(&self, image: &Image, ij: IVec2) -> Color {
-        let i = self.u_address_mode.convert(ij.x, image.width());
-        let j = self.v_address_mode.convert(ij.y, image.height());
-        return image.get_color((i, j));
+    fn anisotropic_sample(&self, image: &Image<u32>, rs: Vec2, lod: f32) -> Color {
+        let rs = rs - vec2(0.5, 0.5);
+        let a = nalgebra_glm::fract(&rs);
+        let b = lod.fract();
+        let ij0 = nalgebra_glm::floor(&rs).try_cast().unwrap();
+        let lod_0 = lod.floor() as usize;
+        let samples = [
+            (ij0 + vec2(0, 0), lod_0, 1.0 - a.x, 1.0 - a.y, 1.0 - b),
+            (ij0 + vec2(1, 0), lod_0, a.x, 1.0 - a.y, 1.0 - b),
+            (ij0 + vec2(0, 1), lod_0, 1.0 - a.x, a.y, 1.0 - b),
+            (ij0 + vec2(1, 1), lod_0, a.x, a.y, 1.0 - b),
+            (ij0 + vec2(0, 0), lod_0 + 1, 1.0 - a.x, 1.0 - a.y, b),
+            (ij0 + vec2(1, 0), lod_0 + 1, a.x, 1.0 - a.y, b),
+            (ij0 + vec2(0, 1), lod_0 + 1, 1.0 - a.x, a.y, b),
+            (ij0 + vec2(1, 1), lod_0 + 1, a.x, a.y, b),
+        ];
+        return samples
+            .map(|(ij, lod, w_i, w_j, w_k)| w_i * w_j * w_k * self.sample_texel(image, ij, lod))
+            .into_iter()
+            .sum();
+    }
+
+    fn sample_texel(&self, image: &Image<u32>, mut ij: IVec2, lod: usize) -> Color {
+        let lod = lod.min(image.mip_levels() - 1);
+        let [width, height] = image.dimens_at_lod(lod);
+        for _ in 0..lod {
+            ij /= 2;
+        }
+        let i = self.u_address_mode.convert(ij.x, width);
+        let j = self.v_address_mode.convert(ij.y, height);
+        return image.get_color_at_lod([i, j], lod);
     }
 }

@@ -25,7 +25,7 @@ impl RasterizationPipeline {
         &self,
         framebuffer: &mut Framebuffer,
         transform: &Mat4,
-        (image, sampler): (&Image, &Sampler),
+        (image, sampler): (&Image<u32>, &Sampler),
         vertices: &[Vertex],
     ) {
         let primitive_count = vertices.len() / 3;
@@ -53,7 +53,7 @@ impl RasterizationPipeline {
                          dt_dx,
                          dt_dy,
                      }| {
-                        let screen_coords = (coords.x as usize, coords.y as usize);
+                        let screen_coords = [coords.x, coords.y];
                         let Vertex { coords, uv, .. } = v0.bary_lerp(&v1, &v2, t);
                         let duv_dx = v0.duv(&v1, &v2, t, dt_dx);
                         let duv_dy = v0.duv(&v1, &v2, t, dt_dy);

@@ -18,7 +18,7 @@ const WINDOW_WIDTH: usize = 640;
 const WINDOW_HEIGHT: usize = 360;
 
 fn main() {
-    let mut framebuffer = Framebuffer::new(WINDOW_WIDTH, WINDOW_HEIGHT);
+    let mut framebuffer = Framebuffer::new([WINDOW_WIDTH, WINDOW_HEIGHT]);
     let mut window = Window::new(
         WINDOW_TITLE,
         WINDOW_WIDTH,
@@ -28,7 +28,7 @@ fn main() {
     .unwrap();
     window.set_target_fps(60);
 
-    let image = Image::from_file("textures/historical.jpg".into()).unwrap();
+    let image = Image::from_file("textures/historical.jpg".into(), 4).unwrap();
     let sampler = Sampler::new(
         AddressMode::Clamp,
         AddressMode::Clamp,

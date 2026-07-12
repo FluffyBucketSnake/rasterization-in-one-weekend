@@ -1,26 +1,21 @@
-use std::ops::RangeBounds;
-
 use minifb::Window;
 
 use crate::{
-    color::{from_raw_color, to_raw_color, Color},
-    image::map_coords_to_index,
+    color::{to_raw_color, Color},
+    image::Image,
+    types::{Coords2D, Dimens2D},
 };
 
 pub struct Framebuffer {
-    color_attachment: Vec<u32>,
-    depth_attachment: Vec<f32>,
-    width: usize,
-    height: usize,
+    color_attachment: Image<u32>,
+    depth_attachment: Image<f32>,
 }
 
 impl Framebuffer {
-    pub fn new(width: usize, height: usize) -> Self {
+    pub fn new([width, height]: Dimens2D) -> Self {
         Self {
-            color_attachment: vec![0; width * height],
-            depth_attachment: vec![std::f32::INFINITY; width * height],
-            width,
-            height,
+            color_attachment: Image::filled(0, [width, height], 1),
+            depth_attachment: Image::filled(std::f32::INFINITY, [width, height], 1),
         }
     }
 
@@ -29,15 +24,15 @@ impl Framebuffer {
         self.depth_attachment.fill(depth);
     }
 
-    pub fn test_and_set_depth_safe(&mut self, coords: (usize, usize), depth: f32) -> bool {
+    pub fn test_and_set_depth_safe(&mut self, coords: Coords2D, depth: f32) -> bool {
         if !self.contains(coords) {
             return false;
         }
         return self.test_and_set_depth(coords, depth);
     }
 
-    pub fn test_and_set_depth(&mut self, coords: (usize, usize), depth: f32) -> bool {
-        let target = &mut self.depth_attachment[map_coords_to_index(coords, self.width)];
+    pub fn test_and_set_depth(&mut self, coords: Coords2D, depth: f32) -> bool {
+        let target = &mut self.depth_attachment[coords];
         if depth < *target {
             *target = depth;
             return true;
@@ -45,36 +40,40 @@ impl Framebuffer {
         return false;
     }
 
-    pub fn set_color(&mut self, coords: (usize, usize), color: Color) {
-        self.color_attachment[map_coords_to_index(coords, self.width)] = to_raw_color(color);
+    pub fn set_color(&mut self, coords: Coords2D, color: Color) {
+        self.color_attachment.set_color(coords, color);
     }
 
-    pub fn set_color_safe(&mut self, coords: (usize, usize), color: Color) {
+    pub fn set_color_safe(&mut self, coords: Coords2D, color: Color) {
         if !self.contains(coords) {
             return;
         }
         self.set_color(coords, color);
     }
 
-    pub fn get_color(&self, coords: (usize, usize)) -> Color {
-        from_raw_color(self.color_attachment[map_coords_to_index(coords, self.width)])
+    pub fn get_color(&self, coords: Coords2D) -> Color {
+        self.color_attachment.get_color(coords)
     }
 
     pub fn update_window(&self, window: &mut Window) {
         window
-            .update_with_buffer(&self.color_attachment, self.width, self.height)
+            .update_with_buffer(
+                &self.color_attachment.buffer_at_lod(0),
+                self.width(),
+                self.height(),
+            )
             .unwrap();
     }
 
     pub fn width(&self) -> usize {
-        self.width
+        self.color_attachment.width()
     }
 
     pub fn height(&self) -> usize {
-        self.height
+        self.color_attachment.height()
     }
 
-    pub fn contains(&self, coords: (usize, usize)) -> bool {
-        coords.0 < self.width && coords.1 < self.height
+    pub fn contains(&self, coords: Coords2D) -> bool {
+        self.color_attachment.contains(coords)
     }
 }

@@ -7,5 +7,6 @@ pub mod pipeline;
 pub mod rasterization;
 pub mod sampler;
 pub mod triangulation;
+pub mod types;
 pub mod vertex;
 pub mod viewport;

@@ -21,51 +21,77 @@ impl RasterizationPipeline {
         Self { viewport }
     }
 
-    pub fn draw_triangles(
+    pub fn draw_triangle(
         &self,
-        framebuffer: &mut Framebuffer,
+        triangle: &[Vertex; 3],
         transform: &Mat4,
         (image, sampler): (&Image<u32>, &Sampler),
+        framebuffer: &mut Framebuffer,
+    ) {
+        let clip_space_triangle = triangle.map(|v| v.transform(transform));
+        let clipped_polygon = clip_triangle(&clip_space_triangle);
+        let clipped_triangles = fan_triangulate(&clipped_polygon);
+        let primitive_count = clipped_triangles.len() / 3;
+        for i in 0..primitive_count {
+            let ndc_triangle = [0, 1, 2]
+                .map(|j| clipped_triangles[3 * i + j])
+                .map(|v| v.homogenize());
+            let screen_coords = [0, 1, 2].map(|i| {
+                self.viewport
+                    .ndc_to_framebuffer(ndc_triangle[i].coords.xy())
+            });
+            let [v0, v1, v2] = ndc_triangle;
+            rasterize_solid_triangle(
+                &screen_coords,
+                |Fragment {
+                     coords,
+                     t,
+                     dt_dx,
+                     dt_dy,
+                 }| {
+                    let screen_coords = [coords.x, coords.y];
+                    let Vertex { coords, uv, .. } = v0.bary_lerp(&v1, &v2, t);
+                    let duv_dx = v0.duv(&v1, &v2, t, dt_dx);
+                    let duv_dy = v0.duv(&v1, &v2, t, dt_dy);
+                    if framebuffer.test_and_set_depth_safe(screen_coords, coords.z) {
+                        framebuffer
+                            .set_color(screen_coords, sampler.sample(image, uv, duv_dx, duv_dy));
+                    }
+                },
+            );
+        }
+    }
+
+    pub fn draw_triangles(
+        &self,
         vertices: &[Vertex],
+        transform: &Mat4,
+        image_sampler: (&Image<u32>, &Sampler),
+        framebuffer: &mut Framebuffer,
     ) {
         let primitive_count = vertices.len() / 3;
+
+        for i in 0..primitive_count {
+            let triangle = [0, 1, 2].map(|j| vertices[3 * i + j]);
+            self.draw_triangle(&triangle, transform, image_sampler, framebuffer);
+        }
+    }
+
+    pub fn draw_triangles_indexed(
+        &self,
+        indices: &[usize],
+        vertices: &[Vertex],
+        transform: &Mat4,
+        image_sampler: (&Image<u32>, &Sampler),
+        framebuffer: &mut Framebuffer,
+    ) {
+        let primitive_count = indices.len() / 3;
+
         for i in 0..primitive_count {
             let triangle = [0, 1, 2]
-                .map(|j| vertices[3 * i + j])
-                .map(|v| v.transform(transform));
-            let clipped_polygon = clip_triangle(&triangle);
-            let clipped_triangles = fan_triangulate(&clipped_polygon);
-            let primitive_count = clipped_triangles.len() / 3;
-            for i in 0..primitive_count {
-                let ndc_triangle = [0, 1, 2]
-                    .map(|j| clipped_triangles[3 * i + j])
-                    .map(|v| v.homogenize());
-                let screen_coords = [0, 1, 2].map(|i| {
-                    self.viewport
-                        .ndc_to_framebuffer(ndc_triangle[i].coords.xy())
-                });
-                let [v0, v1, v2] = ndc_triangle;
-                rasterize_solid_triangle(
-                    &screen_coords,
-                    |Fragment {
-                         coords,
-                         t,
-                         dt_dx,
-                         dt_dy,
-                     }| {
-                        let screen_coords = [coords.x, coords.y];
-                        let Vertex { coords, uv, .. } = v0.bary_lerp(&v1, &v2, t);
-                        let duv_dx = v0.duv(&v1, &v2, t, dt_dx);
-                        let duv_dy = v0.duv(&v1, &v2, t, dt_dy);
-                        if framebuffer.test_and_set_depth_safe(screen_coords, coords.z) {
-                            framebuffer.set_color(
-                                screen_coords,
-                                sampler.sample(image, uv, duv_dx, duv_dy),
-                            );
-                        }
-                    },
-                );
-            }
+                .map(|j| indices[3 * i + j])
+                .map(|idx| vertices[idx]);
+            self.draw_triangle(&triangle, transform, image_sampler, framebuffer);
         }
     }
 }

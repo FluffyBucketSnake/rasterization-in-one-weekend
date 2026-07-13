@@ -67,11 +67,12 @@ fn main() -> anyhow::Result<()> {
             angle,
         );
         let transform = proj_view * world;
-        pipeline.draw_triangles(
-            &mut framebuffer,
+        pipeline.draw_triangles_indexed(
+            &model.indices,
+            &model.vertices,
             &transform,
             (&model.textures[0], &sampler),
-            &model.vertices,
+            &mut framebuffer,
         );
         framebuffer.update_window(&mut window);
         frame += 1;

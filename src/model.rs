@@ -75,6 +75,7 @@ pub fn unit_cube<V: Clone>(mut f: impl FnMut(CubeSide, Vec3) -> V) -> [V; 36] {
 
 pub struct Model {
     pub vertices: Vec<Vertex>,
+    pub indices: Vec<usize>,
     pub textures: Vec<Image<u32>>,
 }
 
@@ -308,21 +309,20 @@ pub fn load_gltf(path: PathBuf, mip_levels: usize) -> gltf::Result<Model> {
 
     let (document, buffers, images) = gltf::import(path)?;
     let mut vertices = Vec::new();
-    let mut indexes = Vec::new();
+    let mut indices = Vec::new();
     for node in document.nodes() {
         process_node(
             node,
             Mat4::identity(),
             &buffers,
             &mut vertices,
-            &mut indexes,
+            &mut indices,
         );
     }
-
-    let total_vertices = indexes.iter().map(|&i| vertices[i]).collect();
     let textures = process_textures(images, mip_levels);
     return Ok(Model {
-        vertices: total_vertices,
+        vertices,
+        indices,
         textures,
     });
 }

@@ -3,7 +3,7 @@ use std::{
     path::PathBuf,
 };
 
-use image::Rgba;
+use image::{Rgba, RgbaImage};
 
 use crate::{
     color::{from_raw_color, to_raw_color, Color},
@@ -120,7 +120,42 @@ impl Image<u32> {
             width = (width / 2).max(1);
             height = (height / 2).max(1);
         }
-        Ok(Self::from_raw_parts(buffers, [width_0, height_0]))
+        return Ok(Self::from_raw_parts(buffers, [width_0, height_0]));
+    }
+
+    pub fn from_base_image(
+        base: Vec<u32>,
+        [width_0, height_0]: Dimens2D,
+        mip_levels: usize,
+    ) -> Self {
+        assert!(mip_levels > 0, "needs at least 1 mip level");
+
+        let mut width = width_0 as u32;
+        let mut height = height_0 as u32;
+
+        let base_image_view = RgbaImage::from_fn(width, height, |x, y| {
+            let [b, g, r, a] = base[y as usize * width_0 + x as usize].to_le_bytes();
+            Rgba([r, g, b, a])
+        });
+        let mut buffers = Vec::with_capacity(mip_levels);
+        buffers.push(base.clone());
+        for _ in 1..mip_levels {
+            width = (width / 2).max(1);
+            height = (height / 2).max(1);
+            let resized_image = image::imageops::resize(
+                &base_image_view,
+                width,
+                height,
+                image::imageops::FilterType::Gaussian,
+            );
+            let buffer = resized_image
+                .pixels()
+                .map(|Rgba(c)| c.map(|c| c as u32))
+                .map(|[r, g, b, a]| (a << 24) | (r << 16) | (g << 8) | b)
+                .collect::<Vec<_>>();
+            buffers.push(buffer);
+        }
+        return Self::from_raw_parts(buffers, [width_0, height_0]);
     }
 
     pub fn get_color(&self, coords: Coords2D) -> Color {

@@ -1,15 +1,13 @@
 use std::f32::consts::PI;
 
 use minifb::{Key, KeyRepeat, Window, WindowOptions};
-use nalgebra_glm::{vec2, vec3};
+use nalgebra_glm::vec3;
 use rasterization_in_a_weekend::{
-    color::{BLACK, BLUE, GREEN, RED, WHITE},
+    color::BLACK,
     framebuffer::Framebuffer,
-    image::Image,
-    model::unit_cube,
+    model::load_gltf,
     pipeline::RasterizationPipeline,
     sampler::{AddressMode, Filter, Sampler},
-    vertex::Vertex,
     viewport::Viewport,
 };
 
@@ -17,7 +15,7 @@ const WINDOW_TITLE: &str = "Rasterization in One Weekend";
 const WINDOW_WIDTH: usize = 640;
 const WINDOW_HEIGHT: usize = 360;
 
-fn main() {
+fn main() -> anyhow::Result<()> {
     let mut framebuffer = Framebuffer::new([WINDOW_WIDTH, WINDOW_HEIGHT]);
     let mut window = Window::new(
         WINDOW_TITLE,
@@ -28,7 +26,7 @@ fn main() {
     .unwrap();
     window.set_target_fps(60);
 
-    let image = Image::from_file("textures/historical.jpg".into(), 4).unwrap();
+    let model = load_gltf("models/Ball.glb".into(), 4)?;
     let sampler = Sampler::new(
         AddressMode::Clamp,
         AddressMode::Clamp,
@@ -54,30 +52,6 @@ fn main() {
         &vec3(2.0, 2.0, 2.0),
     );
     let pipeline = RasterizationPipeline::new(viewport);
-    let mut colors = std::iter::repeat([RED, GREEN, BLUE, WHITE]).flatten();
-    let mut uv = std::iter::repeat([
-        vec2(0.0, 0.0),
-        vec2(0.0, 1.0),
-        vec2(1.0, 1.0),
-        vec2(1.0, 0.0),
-    ])
-    .flatten();
-    let vertices = unit_cube(|_, c| {
-        Vertex::new(
-            c - vec3(0.0, 2.0, 0.0),
-            colors.next().unwrap(),
-            uv.next().unwrap(),
-        )
-    })
-    .into_iter()
-    .chain(unit_cube(|_, c| {
-        Vertex::new(
-            c + vec3(0.0, 2.0, 0.0),
-            colors.next().unwrap(),
-            uv.next().unwrap(),
-        )
-    }))
-    .collect::<Vec<_>>();
 
     let amplitude = 1.0;
     let speed = PI / 60.0;
@@ -93,8 +67,14 @@ fn main() {
             angle,
         );
         let transform = proj_view * world;
-        pipeline.draw_triangles(&mut framebuffer, &transform, (&image, &sampler), &vertices);
+        pipeline.draw_triangles(
+            &mut framebuffer,
+            &transform,
+            (&model.textures[0], &sampler),
+            &model.vertices,
+        );
         framebuffer.update_window(&mut window);
         frame += 1;
     }
+    return Ok(());
 }

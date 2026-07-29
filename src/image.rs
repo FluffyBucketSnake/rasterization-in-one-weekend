@@ -10,6 +10,7 @@ use crate::{
     types::{Coords2D, Dimens2D, Dimens3D},
 };
 
+#[derive(Clone)]
 pub struct Image<T> {
     mip_chain: Vec<Vec<T>>,
     width_0: usize,

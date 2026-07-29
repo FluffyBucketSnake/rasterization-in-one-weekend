@@ -9,7 +9,8 @@ use rasterization_in_a_weekend::{
     pipeline::RasterizationPipeline,
     sampler::{AddressMode, Filter, Sampler},
     shaders::{
-        BasicUniforms, BasicVertex, BasicVertexShader, Environment, PhongMaterial, PointLight,
+        BasicFragmentShader, BasicUniforms, BasicVertex, BasicVertexShader, Environment,
+        PhongMaterial, PointLight,
     },
     viewport::Viewport,
 };
@@ -47,8 +48,9 @@ fn main() -> anyhow::Result<()> {
         Filter::Linear,
     );
     let vertex_shader = BasicVertexShader::default();
+    let fragment_shader = BasicFragmentShader::default();
     let viewport = Viewport::full(WINDOW_WIDTH as f32, WINDOW_HEIGHT as f32);
-    let pipeline = RasterizationPipeline::new(vertex_shader, viewport);
+    let pipeline = RasterizationPipeline::new(vertex_shader, fragment_shader, viewport);
 
     // Uniforms
     let eye = vec3(0.0, 0.0, 0.0);
@@ -78,6 +80,7 @@ fn main() -> anyhow::Result<()> {
             specular_exp: 32.0,
             diffuse_color: color::WHITE,
             specular_color: color::WHITE,
+            texture: (model.textures[0].clone(), sampler),
         },
         env: Environment {
             ambient_color: color::BLACK,
@@ -106,7 +109,6 @@ fn main() -> anyhow::Result<()> {
             &model.indices,
             &model.vertices,
             &uniforms,
-            (&model.textures[0], &sampler),
             &mut framebuffer,
         );
 

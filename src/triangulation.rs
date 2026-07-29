@@ -1,6 +1,4 @@
-use crate::vertex::Vertex;
-
-pub fn fan_triangulate(vertices: &[Vertex]) -> Vec<Vertex> {
+pub fn fan_triangulate<T: Clone + Copy>(vertices: &[T]) -> Vec<T> {
     if vertices.len() < 3 {
         return vec![];
     }

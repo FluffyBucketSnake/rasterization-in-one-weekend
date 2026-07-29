@@ -1,8 +1,8 @@
-use nalgebra_glm::Vec4;
+use nalgebra_glm::{lerp, Vec4};
 
-use crate::vertex::Vertex;
+use crate::shaders::FragmentData;
 
-pub fn clip_triangle(input_vertices: &[Vertex; 3]) -> Vec<Vertex> {
+pub fn clip_triangle<F: FragmentData>(input: &[(Vec4, F); 3]) -> Vec<(Vec4, F)> {
     const PLANES: [Vec4; 6] = [
         Vec4::new(1.0, 0.0, 0.0, 1.0),
         Vec4::new(-1.0, 0.0, 0.0, 1.0),
@@ -19,33 +19,33 @@ pub fn clip_triangle(input_vertices: &[Vertex; 3]) -> Vec<Vertex> {
     // ];
 
     let mut buffer_vertices = Vec::with_capacity(3 + PLANES.len());
-    buffer_vertices.extend(input_vertices.into_iter().copied());
-    let mut input_vertices = Vec::new();
+    buffer_vertices.extend(input.into_iter().copied());
+    let mut input = Vec::new();
     for plane in PLANES {
-        input_vertices.clone_from(&buffer_vertices);
+        input.clone_from(&buffer_vertices);
         buffer_vertices.clear();
 
-        if input_vertices.len() == 0 {
+        if input.len() == 0 {
             return vec![];
         }
 
-        let mut j = input_vertices.len() - 1;
-        for i in 0..input_vertices.len() {
-            let vertex_j = input_vertices[j];
-            let vertex_i = input_vertices[i];
+        let mut j = input.len() - 1;
+        for i in 0..input.len() {
+            let (coords_j, frag_j) = input[j];
+            let (coords_i, frag_i) = input[i];
 
-            let distance_j = vertex_j.coords.dot(&plane);
-            let distance_i = vertex_i.coords.dot(&plane);
+            let distance_j = coords_j.dot(&plane);
+            let distance_i = coords_i.dot(&plane);
             let alpha = distance_j / (distance_j - distance_i);
-            let intersection = vertex_j.lerp(&vertex_i, alpha);
+            let intersection = coords_j.lerp(&coords_i, alpha);
 
             if distance_i >= 0.0 {
                 if distance_j < 0.0 {
-                    buffer_vertices.push(intersection);
+                    buffer_vertices.push((intersection, frag_j.lerp(&frag_i, alpha)));
                 }
-                buffer_vertices.push(vertex_i);
+                buffer_vertices.push((coords_i, frag_i));
             } else if distance_j >= 0.0 {
-                buffer_vertices.push(intersection);
+                buffer_vertices.push((intersection, frag_j.lerp(&frag_i, alpha)));
             }
             j = i;
         }

@@ -10,7 +10,6 @@ use nalgebra_glm::{vec2, Mat4, Vec2, Vec3, Vec4};
 use crate::{
     color::{self, Color},
     image::Image,
-    vertex::Vertex,
 };
 
 pub fn unit_triangle<V>(f: impl FnMut(Vec2) -> V) -> [V; 3] {

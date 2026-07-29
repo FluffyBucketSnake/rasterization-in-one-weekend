@@ -1,6 +1,6 @@
 use nalgebra_glm::Vec2;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Viewport {
     pub x: f32,
     pub y: f32,

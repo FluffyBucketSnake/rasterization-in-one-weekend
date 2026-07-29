@@ -21,11 +21,6 @@ impl Vertex {
         }
     }
 
-    pub fn transform(mut self, transform: &Mat4) -> Self {
-        self.coords = transform * self.coords;
-        self
-    }
-
     pub fn lerp(&self, y: &Self, a: f32) -> Self {
         use nalgebra_glm::lerp;
         Self {

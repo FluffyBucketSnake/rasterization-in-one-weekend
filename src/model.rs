@@ -13,7 +13,7 @@ use crate::{
     vertex::Vertex,
 };
 
-pub fn unit_triangle<V>(mut f: impl FnMut(Vec2) -> V) -> [V; 3] {
+pub fn unit_triangle<V>(f: impl FnMut(Vec2) -> V) -> [V; 3] {
     [vec2(0.0, -0.5), vec2(-0.5, 0.5), vec2(0.5, 0.5)].map(f)
 }
 
@@ -73,18 +73,23 @@ pub fn unit_cube<V: Clone>(mut f: impl FnMut(CubeSide, Vec3) -> V) -> [V; 36] {
     std::array::from_fn(|_| iter.next().unwrap())
 }
 
-pub struct Model {
-    pub vertices: Vec<Vertex>,
+pub struct Model<V> {
+    pub vertices: Vec<V>,
     pub indices: Vec<usize>,
     pub textures: Vec<Image<u32>>,
 }
 
-pub fn load_gltf(path: PathBuf, mip_levels: usize) -> gltf::Result<Model> {
-    fn process_node(
+pub fn load_gltf<V>(
+    path: PathBuf,
+    mip_levels: usize,
+    into_vertex: impl Fn(Vec4, Vec2, Vec3, Option<Color>) -> V,
+) -> gltf::Result<Model<V>> {
+    fn process_node<V>(
         node: gltf::Node<'_>,
         parent_transform: Mat4,
         buffers: &Vec<buffer::Data>,
-        vertices_output: &mut Vec<Vertex>,
+        into_vertex: &impl Fn(Vec4, Vec2, Vec3, Option<Color>) -> V,
+        vertices_output: &mut Vec<V>,
         indexes_output: &mut Vec<usize>,
     ) {
         let transform = parent_transform * read_transform(node.transform());
@@ -96,6 +101,7 @@ pub fn load_gltf(path: PathBuf, mip_levels: usize) -> gltf::Result<Model> {
                     read_positions(primitive.get(&Semantic::Positions).unwrap(), buffers);
                 let tex_coords =
                     read_tex_coords(primitive.get(&Semantic::TexCoords(0)).unwrap(), buffers);
+                let normals = read_normals(primitive.get(&Semantic::Normals).unwrap(), buffers);
                 assert_eq!(
                     positions.len(),
                     tex_coords.len(),
@@ -106,18 +112,28 @@ pub fn load_gltf(path: PathBuf, mip_levels: usize) -> gltf::Result<Model> {
                     read_colors(primitive.get(&Semantic::Colors(0)), buffers, vertex_count);
                 assert_eq!(colors.len(), vertex_count, "color accessor is incompatible");
                 let indexes = read_indexes(primitive.indices(), base_idx, vertex_count, buffers);
-                vertices_output.extend(positions.into_iter().zip(tex_coords).zip(colors).map(
-                    |((coords, uv), color)| Vertex {
-                        coords: transform * coords,
-                        uv,
-                        color,
-                    },
-                ));
+                vertices_output.extend(
+                    positions
+                        .into_iter()
+                        .zip(tex_coords)
+                        .zip(colors)
+                        .zip(normals)
+                        .map(|(((coords, uv), color), normal)| {
+                            into_vertex(coords, uv, normal, color)
+                        }),
+                );
                 indexes_output.extend(indexes);
             }
         }
         for child in node.children() {
-            process_node(child, transform, buffers, vertices_output, indexes_output);
+            process_node(
+                child,
+                transform,
+                buffers,
+                into_vertex,
+                vertices_output,
+                indexes_output,
+            );
         }
     }
 
@@ -181,11 +197,11 @@ pub fn load_gltf(path: PathBuf, mip_levels: usize) -> gltf::Result<Model> {
         accessor: Option<Accessor<'_>>,
         buffers: &Vec<buffer::Data>,
         expected_len: usize,
-    ) -> Vec<Color> {
+    ) -> Vec<Option<Color>> {
         let accessor = if let Some(accessor) = accessor {
             accessor
         } else {
-            return vec![color::WHITE; expected_len];
+            return vec![None; expected_len];
         };
 
         let view = accessor.view().expect("sparse accessors are unsupported");
@@ -202,30 +218,54 @@ pub fn load_gltf(path: PathBuf, mip_levels: usize) -> gltf::Result<Model> {
         ) {
             (Dimensions::Vec3, DataType::F32, _) => {
                 read_vec3_f32_view(&accessor, &view, data, &mut |x, y, z| {
-                    output.push(Color::new(x, y, z))
+                    output.push(Some(Color::new(x, y, z)))
                 });
             }
             (Dimensions::Vec4, DataType::F32, _) => {
                 read_vec4_f32_view(&accessor, &view, data, &mut |x, y, z, _| {
-                    output.push(Color::new(x, y, z))
+                    output.push(Some(Color::new(x, y, z)))
                 });
             }
             (Dimensions::Vec3, DataType::U8, _) => {
                 read_vec3_u8_view(&accessor, &view, data, &mut |x, y, z| {
-                    output.push(Color::new(
+                    output.push(Some(Color::new(
                         x as f32 / 255.0,
                         y as f32 / 255.0,
                         z as f32 / 255.0,
-                    ))
+                    )))
                 });
             }
             (Dimensions::Vec4, DataType::U8, _) => {
                 read_vec4_u8_view(&accessor, &view, data, &mut |x, y, z, _| {
-                    output.push(Color::new(
+                    output.push(Some(Color::new(
                         x as f32 / 255.0,
                         y as f32 / 255.0,
                         z as f32 / 255.0,
-                    ))
+                    )))
+                });
+            }
+            other => panic!("incompatible accessor: {:?}", other),
+        }
+        return output;
+    }
+
+    fn read_normals(accessor: Accessor<'_>, buffers: &Vec<buffer::Data>) -> Vec<Vec3> {
+        let view = accessor.view().expect("sparse accessors are unsupported");
+        let buffer = &buffers[view.buffer().index()];
+        let base = view.offset() + accessor.offset();
+        let len = view.length();
+        let data = &buffer[base..base + len];
+
+        let mut output = Vec::with_capacity(accessor.count());
+        match (accessor.dimensions(), accessor.data_type()) {
+            (Dimensions::Vec3, DataType::F32) => {
+                read_vec3_f32_view(&accessor, &view, data, &mut |x, y, z| {
+                    output.push(Vec3::new(x, -y, z))
+                });
+            }
+            (Dimensions::Vec4, DataType::F32) => {
+                read_vec4_f32_view(&accessor, &view, data, &mut |x, y, z, _| {
+                    output.push(Vec3::new(x, -y, z))
                 });
             }
             other => panic!("incompatible accessor: {:?}", other),
@@ -315,6 +355,7 @@ pub fn load_gltf(path: PathBuf, mip_levels: usize) -> gltf::Result<Model> {
             node,
             Mat4::identity(),
             &buffers,
+            &into_vertex,
             &mut vertices,
             &mut indices,
         );
